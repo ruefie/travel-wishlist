@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Travel Wishlist</title>
+  <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    .visited-btn {
+      background-color: blue;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <div class="container mt-4">
+    <h1 class="mb-4">Travel Wishlist</h1>
+    <form id="country-form" class="form-inline mb-4">
+      <div class="form-group mr-2">
+        <input type="text" class="form-control" name="name" id="name" placeholder="Country Name" required>
+      </div>
+      <div class="form-group mr-2">
+        <input type="text" class="form-control" name="alpha2Code" id="alpha2Code" placeholder="Alpha 2 Code" required>
+      </div>
+      <div class="form-group mr-2">
+        <input type="text" class="form-control" name="alpha3Code" id="alpha3Code" placeholder="Alpha 3 Code" required>
+      </div>
+      <button type="submit" class="btn btn-primary">Add Country</button>
+    </form>
+    <ul id="countries-list" class="list-group">
+      <% countries.forEach(country => { %>
+        <li class="list-group-item d-flex justify-content-between align-items-center" id="<%= country.alpha2Code %>">
+          <%= country.name %> (<%= country.alpha2Code %>, <%= country.alpha3Code %>)
+          <span>
+            <button class="btn btn-outline-success btn-sm mark-visited" data-code="<%= country.alpha2Code %>">
+              <%= country.visited ? 'Visited' : 'Mark as Visited' %>
+            </button>
+            <button class="btn btn-outline-danger btn-sm delete-country" data-code="<%= country.alpha2Code %>">Delete</button>
+          </span>
+        </li>
+      <% }) %>
+    </ul>
+  </div>
+
+  <script>
+    document.getElementById('country-form').addEventListener('submit', async function(event) {
+      event.preventDefault();
+
+      const name = document.getElementById('name').value;
+      const alpha2Code = document.getElementById('alpha2Code').value;
+      const alpha3Code = document.getElementById('alpha3Code').value;
+
+      const response = await fetch('/api/countries', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ name, alpha2Code, alpha3Code })
+      });
+
+      if (response.ok) {
+        const newCountry = await response.json();
+        const countryList = document.getElementById('countries-list');
+
+        const newCountryElement = document.createElement('li');
+        newCountryElement.className = 'list-group-item d-flex justify-content-between align-items-center';
+        newCountryElement.id = newCountry.alpha2Code;
+        newCountryElement.innerHTML = `
+          ${newCountry.name} (${newCountry.alpha2Code}, ${newCountry.alpha3Code})
+          <span>
+            <button class="btn btn-outline-success btn-sm mark-visited" data-code="${newCountry.alpha2Code}">Mark as Visited</button>
+            <button class="btn btn-outline-danger btn-sm delete-country" data-code="${newCountry.alpha2Code}">Delete</button>
+          </span>
+        `;
+
+        countryList.prepend(newCountryElement);
+
+        document.getElementById('country-form').reset();
+      } else {
+        const errorData = await response.json();
+        console.error('Error adding country:', errorData.errors);
+      }
+    });
+
+    document.getElementById('countries-list').addEventListener('click', async function(event) {
+      if (event.target.classList.contains('mark-visited')) {
+        const button = event.target;
+        const code = button.dataset.code;
+        const isVisited = button.textContent === 'Visited';
+
+        const response = await fetch(`/api/countries/${code}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ visited: !isVisited })
+        });
+
+        if (response.ok) {
+          if (isVisited) {
+            button.textContent = 'Mark as Visited';
+            button.classList.remove('visited-btn');
+            button.classList.add('btn-outline-primary');
+          } else {
+            button.textContent = 'Visited';
+            button.classList.remove('btn-outline-primary');
+            button.classList.add('visited-btn');
+          }
+        } else {
+          console.error('Error updating country:', await response.json());
+        }
+      }
+
+      if (event.target.classList.contains('delete-country')) {
+        const code = event.target.dataset.code;
+
+        const response = await fetch(`/api/countries/${code}`, {
+          method: 'DELETE'
+        });
+
+        if (response.ok) {
+          document.getElementById(code).remove();
+        } else {
+          console.error('Error deleting country:', await response.json());
+        }
+      }
+    });
+  </script>
+</body>
+</html>
